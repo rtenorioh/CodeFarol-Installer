@@ -156,7 +156,7 @@ if [ -d "$INSTALL_DIR" ]; then
   sudo -u deploy git pull origin main >> "$LOG_FILE" 2>&1
   log "WARN" "Repositório já existia — atualizado via git pull"
 else
-  sudo -u deploy git clone https://github.com/rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+  sudo -u deploy git clone git@github.com:rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
   cd "$INSTALL_DIR"
   log "OK" "Repositório clonado"
 fi

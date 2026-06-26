@@ -120,7 +120,7 @@ log "OK" "Dependências instaladas"
 
 # ── Etapa 3: Usuário deploy ─────────────────────────────────────────────────
 step 3 10 "Configurando usuário 'deploy'..."
-DEPLOY_PASSWORD=$(openssl rand -base64 18)
+DEPLOY_PASSWORD=$(openssl rand -hex 18)
 if id "deploy" &>/dev/null; then
   log "WARN" "Usuário 'deploy' já existe — mantendo senha atual"
 else
@@ -164,10 +164,10 @@ fi
 # ── Etapa 7: Gerar secrets + .env.production ─────────────────────────────────
 step 7 10 "Gerando secrets e criando .env.production..."
 
-DB_PASSWORD=$(openssl rand -base64 24)
-JWT_SECRET=$(openssl rand -base64 48)
+DB_PASSWORD=$(openssl rand -hex 24)
+JWT_SECRET=$(openssl rand -hex 48)
 SETTINGS_ENCRYPTION_KEY=$(openssl rand -hex 32)
-REDIS_PASSWORD=$(openssl rand -base64 24)
+REDIS_PASSWORD=$(openssl rand -hex 24)
 
 install -o deploy -g deploy -m 600 /dev/null "$INSTALL_DIR/.env.production"
 cat > "$INSTALL_DIR/.env.production" <<ENVFILE

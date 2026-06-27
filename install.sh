@@ -159,9 +159,13 @@ INSTALL_DIR="/home/deploy/CodeFarol"
 # usuário 'deploy' ANTES de rodar o instalador. Sem essa checagem, um clone
 # via HTTPS sem credenciais ficaria pendurado num prompt de senha que nunca
 # seria aceito (GitHub não autentica mais git por senha de conta).
-if ! sudo -u deploy ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+SSH_CHECK_OUTPUT=$(sudo -u deploy ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -T git@github.com </dev/null 2>&1) || true
+echo "$SSH_CHECK_OUTPUT" >> "$LOG_FILE"
+if ! echo "$SSH_CHECK_OUTPUT" | grep -q "successfully authenticated"; then
   log "ERROR" "Usuário 'deploy' não tem acesso SSH ao repositório privado."
-  log "ERROR" "Configure uma deploy key (somente leitura) antes de rodar o instalador:"
+  log "ERROR" "Saída real do teste SSH:"
+  while IFS= read -r line; do log "ERROR" "  $line"; done <<< "$SSH_CHECK_OUTPUT"
+  log "ERROR" "Se a saída acima estiver vazia ou diferente do esperado, configure a deploy key:"
   log "ERROR" "  sudo -u deploy ssh-keygen -t ed25519 -f /home/deploy/.ssh/id_ed25519 -N \"\""
   log "ERROR" "  sudo -u deploy cat /home/deploy/.ssh/id_ed25519.pub"
   log "ERROR" "  Cadastre em: github.com/rtenorioh/CodeFarol/settings/keys"
@@ -170,10 +174,10 @@ fi
 
 if [ -d "$INSTALL_DIR" ]; then
   cd "$INSTALL_DIR"
-  sudo -u deploy git pull origin main >> "$LOG_FILE" 2>&1
+  sudo -u deploy git pull origin main </dev/null >> "$LOG_FILE" 2>&1
   log "WARN" "Repositório já existia — atualizado via git pull"
 else
-  sudo -u deploy git clone git@github.com:rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+  sudo -u deploy git clone git@github.com:rtenorioh/CodeFarol.git "$INSTALL_DIR" </dev/null >> "$LOG_FILE" 2>&1
   cd "$INSTALL_DIR"
   log "OK" "Repositório clonado"
 fi

@@ -149,6 +149,11 @@ else
   log "OK" "Usuário 'deploy' criado"
 fi
 
+# Garante posse correta do home, independente do useradd ter criado o
+# diretório agora ou ele já existir de antes (useradd não ajusta dono/skel
+# quando o diretório já existe — só avisa e segue, deixando o owner antigo).
+chown -R deploy:deploy /home/deploy
+
 # ── Etapa 4: Docker ─────────────────────────────────────────────────────────
 step 4 10 "Instalando Docker..."
 if command -v docker &>/dev/null; then

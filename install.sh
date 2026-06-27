@@ -1,13 +1,13 @@
 #!/bin/bash
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  CodeFarol — Instalador Automático v2                                    ║
-# ║  Não navegue sozinho.                                                    ║
-# ║                                                                          ║
-# ║  Uso:                                                                    ║
-# ║  curl -sSL https://raw.githubusercontent.com/rtenorioh/CodeFarol/        ║
-# ║       main/infra/scripts/install.sh | sudo bash -s                       ║
-# ║       <DOMAIN> <GITHUB_CLIENT_ID> <GITHUB_CLIENT_SECRET>                ║
-# ║       <RESEND_API_KEY> <ADMIN_EMAIL> <ADMIN_GITHUB_USERNAME>             ║
+# ║  CodeFarol — Instalador Automático v2                                      ║
+# ║  Não navegue sozinho.                                                      ║
+# ║                                                                            ║
+# ║  Uso:                                                                      ║
+# ║  curl -sSL https://raw.githubusercontent.com/rtenorioh/CodeFarol/          ║
+# ║       main/infra/scripts/install.sh | sudo bash -s                         ║
+# ║       <DOMAIN> <GITHUB_CLIENT_ID> <GITHUB_CLIENT_SECRET>                   ║
+# ║       <RESEND_API_KEY> <ADMIN_EMAIL> <ADMIN_GITHUB_USERNAME>               ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 set -euo pipefail
@@ -102,8 +102,8 @@ log_summary() {
 
 # ── Banner ───────────────────────────────────────────────────────────────────
 echo -e "${CYAN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║  ${BOLD}CodeFarol — Instalador Automático${NC}${CYAN}        ║${NC}"
-echo -e "${CYAN}║  Não navegue sozinho.                     ║${NC}"
+echo -e "${CYAN}║  ${BOLD}CodeFarol — Instalador Automático${NC}${CYAN}         ║${NC}"
+echo -e "${CYAN}║  Não navegue sozinho.                      ║${NC}"
 echo -e "${CYAN}╚════════════════════════════════════════════╝${NC}"
 
 log "INFO" "Instalação iniciada para domínio: $DOMAIN"
@@ -154,12 +154,26 @@ log "OK" "UFW ativo (SSH, 80, 443)"
 # ── Etapa 6: Clone ──────────────────────────────────────────────────────────
 step 6 10 "Clonando CodeFarol..."
 INSTALL_DIR="/home/deploy/CodeFarol"
+
+# Repositório é privado — precisa de uma deploy key SSH já cadastrada para o
+# usuário 'deploy' ANTES de rodar o instalador. Sem essa checagem, um clone
+# via HTTPS sem credenciais ficaria pendurado num prompt de senha que nunca
+# seria aceito (GitHub não autentica mais git por senha de conta).
+if ! sudo -u deploy ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -T git@github.com 2>&1 | grep -q "successfully authenticated"; then
+  log "ERROR" "Usuário 'deploy' não tem acesso SSH ao repositório privado."
+  log "ERROR" "Configure uma deploy key (somente leitura) antes de rodar o instalador:"
+  log "ERROR" "  sudo -u deploy ssh-keygen -t ed25519 -f /home/deploy/.ssh/id_ed25519 -N \"\""
+  log "ERROR" "  sudo -u deploy cat /home/deploy/.ssh/id_ed25519.pub"
+  log "ERROR" "  Cadastre em: github.com/rtenorioh/CodeFarol/settings/keys"
+  exit 1
+fi
+
 if [ -d "$INSTALL_DIR" ]; then
   cd "$INSTALL_DIR"
   sudo -u deploy git pull origin main >> "$LOG_FILE" 2>&1
   log "WARN" "Repositório já existia — atualizado via git pull"
 else
-  sudo -u deploy git clone https://github.com/rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+  sudo -u deploy git clone git@github.com:rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
   cd "$INSTALL_DIR"
   log "OK" "Repositório clonado"
 fi
@@ -175,9 +189,9 @@ REDIS_PASSWORD=$(openssl rand -hex 16)
 install -o deploy -g deploy -m 600 /dev/null "$INSTALL_DIR/.env.production"
 cat > "$INSTALL_DIR/.env.production" <<ENVFILE
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  CodeFarol — Variáveis de Produção                                       ║
-# ║  Gerado automaticamente em $(date +%Y-%m-%d\ %H:%M:%S)                   ║
-# ║  Secrets internos gerados pelo instalador — NÃO alterar.                 ║
+# ║  CodeFarol — Variáveis de Produção                                         ║
+# ║  Gerado automaticamente em $(date +%Y-%m-%d\ %H:%M:%S)                     ║
+# ║  Secrets internos gerados pelo instalador — NÃO alterar.                   ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 # ── Database (gerado automaticamente) ────────────────────────────────────────

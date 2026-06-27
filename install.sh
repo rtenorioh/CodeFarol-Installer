@@ -123,10 +123,26 @@ log "OK" "Dependências instaladas"
 
 # ── Etapa 3: Usuário deploy ─────────────────────────────────────────────────
 step 3 10 "Configurando usuário 'deploy'..."
-DEPLOY_PASSWORD=$(openssl rand -base64 18)
 if id "deploy" &>/dev/null; then
   log "WARN" "Usuário 'deploy' já existe — mantendo senha atual"
+  DEPLOY_PASSWORD="(usuário já existia — senha não foi alterada pelo instalador)"
 else
+  echo ""
+  echo -e "${YELLOW}Defina a senha do usuário 'deploy' (login SSH e sudo):${NC}"
+  read -r -s -p "Senha: " DEPLOY_PASSWORD < /dev/tty
+  echo ""
+  read -r -s -p "Confirme a senha: " DEPLOY_PASSWORD_CONFIRM < /dev/tty
+  echo ""
+
+  if [ -z "$DEPLOY_PASSWORD" ]; then
+    log "ERROR" "Senha não pode ser vazia. Execute o instalador novamente."
+    exit 1
+  fi
+  if [ "$DEPLOY_PASSWORD" != "$DEPLOY_PASSWORD_CONFIRM" ]; then
+    log "ERROR" "As senhas não coincidem. Execute o instalador novamente."
+    exit 1
+  fi
+
   useradd -m -s /bin/bash deploy
   echo "deploy:$DEPLOY_PASSWORD" | chpasswd
   usermod -aG sudo deploy

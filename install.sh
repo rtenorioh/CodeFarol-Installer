@@ -7,7 +7,7 @@
 # ║  curl -sSL https://raw.githubusercontent.com/rtenorioh/CodeFarol/        ║
 # ║       main/infra/scripts/install.sh | sudo bash -s                       ║
 # ║       <DOMAIN> <GITHUB_CLIENT_ID> <GITHUB_CLIENT_SECRET>                ║
-# ║       <RESEND_API_KEY> <ADMIN_EMAIL>                                     ║
+# ║       <RESEND_API_KEY> <ADMIN_EMAIL> <ADMIN_GITHUB_USERNAME>             ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 set -euo pipefail
@@ -17,20 +17,21 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
 # ── Validação de argumentos ──────────────────────────────────────────────────
-if [ "$#" -ne 5 ]; then
+if [ "$#" -ne 6 ]; then
   echo -e "${RED}Erro: número incorreto de argumentos.${NC}"
   echo ""
   echo "Uso:"
   echo "  curl -sSL https://raw.githubusercontent.com/rtenorioh/CodeFarol/main/infra/scripts/install.sh | sudo bash -s \\"
   echo "    <DOMAIN> <GITHUB_CLIENT_ID> <GITHUB_CLIENT_SECRET> \\"
-  echo "    <RESEND_API_KEY> <ADMIN_EMAIL>"
+  echo "    <RESEND_API_KEY> <ADMIN_EMAIL> <ADMIN_GITHUB_USERNAME>"
   echo ""
   echo "Argumentos:"
-  echo "  DOMAIN                Domínio (ex: codefarol.dev)"
-  echo "  GITHUB_CLIENT_ID      Client ID do GitHub OAuth App"
-  echo "  GITHUB_CLIENT_SECRET  Client Secret do GitHub OAuth App"
-  echo "  RESEND_API_KEY        API Key do Resend"
-  echo "  ADMIN_EMAIL           E-mail do admin"
+  echo "  DOMAIN                  Domínio (ex: codefarol.dev)"
+  echo "  GITHUB_CLIENT_ID        Client ID do GitHub OAuth App"
+  echo "  GITHUB_CLIENT_SECRET    Client Secret do GitHub OAuth App"
+  echo "  RESEND_API_KEY          API Key do Resend"
+  echo "  ADMIN_EMAIL             E-mail do admin"
+  echo "  ADMIN_GITHUB_USERNAME   Username do GitHub do admin inicial (ex: rtenorioh)"
   echo ""
   echo "Senhas de banco, JWT e chaves de encriptação são geradas automaticamente."
   exit 1
@@ -41,6 +42,7 @@ GITHUB_CLIENT_ID="$2"
 GITHUB_CLIENT_SECRET="$3"
 RESEND_API_KEY="$4"
 ADMIN_EMAIL="$5"
+ADMIN_GITHUB_USERNAME="$6"
 
 # ── Verificações ─────────────────────────────────────────────────────────────
 if [ "$(id -u)" -ne 0 ]; then
@@ -106,6 +108,7 @@ echo -e "${CYAN}╚════════════════════�
 
 log "INFO" "Instalação iniciada para domínio: $DOMAIN"
 log "INFO" "E-mail admin: $ADMIN_EMAIL"
+log "INFO" "GitHub username admin: $ADMIN_GITHUB_USERNAME"
 
 # ── Etapa 1: Atualizar sistema ───────────────────────────────────────────────
 step 1 10 "Atualizando sistema..."
@@ -120,7 +123,7 @@ log "OK" "Dependências instaladas"
 
 # ── Etapa 3: Usuário deploy ─────────────────────────────────────────────────
 step 3 10 "Configurando usuário 'deploy'..."
-DEPLOY_PASSWORD=$(openssl rand -hex 18)
+DEPLOY_PASSWORD=$(openssl rand -base64 18)
 if id "deploy" &>/dev/null; then
   log "WARN" "Usuário 'deploy' já existe — mantendo senha atual"
 else
@@ -156,7 +159,7 @@ if [ -d "$INSTALL_DIR" ]; then
   sudo -u deploy git pull origin main >> "$LOG_FILE" 2>&1
   log "WARN" "Repositório já existia — atualizado via git pull"
 else
-  sudo -u deploy git clone git@github.com:rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
+  sudo -u deploy git clone https://github.com/rtenorioh/CodeFarol.git "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
   cd "$INSTALL_DIR"
   log "OK" "Repositório clonado"
 fi
@@ -164,10 +167,10 @@ fi
 # ── Etapa 7: Gerar secrets + .env.production ─────────────────────────────────
 step 7 10 "Gerando secrets e criando .env.production..."
 
-DB_PASSWORD=$(openssl rand -hex 24)
-JWT_SECRET=$(openssl rand -hex 48)
+DB_PASSWORD=$(openssl rand -hex 16)
+JWT_SECRET=$(openssl rand -base64 48)
 SETTINGS_ENCRYPTION_KEY=$(openssl rand -hex 32)
-REDIS_PASSWORD=$(openssl rand -hex 24)
+REDIS_PASSWORD=$(openssl rand -hex 16)
 
 install -o deploy -g deploy -m 600 /dev/null "$INSTALL_DIR/.env.production"
 cat > "$INSTALL_DIR/.env.production" <<ENVFILE
@@ -203,6 +206,7 @@ CORS_ORIGINS=https://${DOMAIN},https://www.${DOMAIN}
 GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
 GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
 GITHUB_CALLBACK_URL=https://${DOMAIN}/v1/auth/github/callback
+ADMIN_GITHUB_USERNAME=${ADMIN_GITHUB_USERNAME}
 
 # ── Resend ───────────────────────────────────────────────────────────────────
 RESEND_API_KEY=${RESEND_API_KEY}

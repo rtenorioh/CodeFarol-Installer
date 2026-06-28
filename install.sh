@@ -272,12 +272,10 @@ log "OK" ".env.production criado (permissão 600)"
 step 8 10 "Obtendo certificado HTTPS..."
 
 sed -i "s/codefarol.dev/${DOMAIN}/g" "$INSTALL_DIR/infra/nginx/conf.d/codefarol.conf"
-sed -i "s/codefarol.dev/${DOMAIN}/g" "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh"
-sed -i "s/admin@codefarol.dev/${ADMIN_EMAIL}/g" "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh"
 
 chmod +x "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh"
 
-if bash "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh" >> "$LOG_FILE" 2>&1; then
+if DOMAIN="$DOMAIN" EMAIL="$ADMIN_EMAIL" bash "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh" >> "$LOG_FILE" 2>&1; then
   log "OK" "Certificado HTTPS obtido"
 else
   log "WARN" "HTTPS falhou — verifique se o DNS já aponta para esta VPS"
@@ -316,6 +314,15 @@ chown -R deploy:deploy /home/deploy/backups
 CRON_CMD="0 3 * * * $INSTALL_DIR/infra/scripts/backup.sh >> /home/deploy/logs/backup/backup.log 2>&1"
 (sudo -u deploy crontab -l 2>/dev/null | grep -v "backup.sh"; echo "$CRON_CMD") | sudo -u deploy crontab -
 log "OK" "Backup diário configurado (3h)"
+
+# Nginx reload a cada 12h para garantir que certificados renovados pelo certbot
+# sejam carregados. O container certbot não tem docker CLI disponível para
+# acionar um --deploy-hook diretamente — usamos um cron no host como
+# mecanismo equivalente (certbot renova com <30 dias de antecedência,
+# portanto 12h de defasagem máxima é aceitável).
+NGINX_RELOAD_CRON="0 */12 * * * docker compose --env-file $INSTALL_DIR/.env.production -f $INSTALL_DIR/docker-compose.prod.yml exec -T nginx nginx -s reload >> /home/deploy/logs/nginx-reload.log 2>&1"
+(sudo -u deploy crontab -l 2>/dev/null | grep -v "nginx -s reload"; echo "$NGINX_RELOAD_CRON") | sudo -u deploy crontab -
+log "OK" "Recarga automática do nginx configurada (12h)"
 
 # ── Health check ─────────────────────────────────────────────────────────────
 log "INFO" "Verificando instalação..."

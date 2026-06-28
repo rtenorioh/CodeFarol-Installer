@@ -275,7 +275,7 @@ sed -i "s/codefarol.dev/${DOMAIN}/g" "$INSTALL_DIR/infra/nginx/conf.d/codefarol.
 
 chmod +x "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh"
 
-if DOMAIN="$DOMAIN" EMAIL="$ADMIN_EMAIL" bash "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh" >> "$LOG_FILE" 2>&1; then
+if DOMAIN="$DOMAIN" EMAIL="$ADMIN_EMAIL" bash "$INSTALL_DIR/infra/scripts/init-letsencrypt.sh" </dev/null >> "$LOG_FILE" 2>&1; then
   log "OK" "Certificado HTTPS obtido"
 else
   log "WARN" "HTTPS falhou — verifique se o DNS já aponta para esta VPS"
@@ -285,7 +285,7 @@ fi
 # ── Etapa 9: Containers ─────────────────────────────────────────────────────
 step 9 10 "Subindo containers..."
 cd "$INSTALL_DIR"
-if ! docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build >> "$LOG_FILE" 2>&1; then
+if ! docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build </dev/null >> "$LOG_FILE" 2>&1; then
   log "ERROR" "Falha ao subir containers. Verifique: docker compose -f docker-compose.prod.yml logs --tail=50"
   exit 1
 fi
@@ -295,12 +295,12 @@ log "OK" "Containers iniciados"
 
 # ── Etapa 10: Migrations + Seed ──────────────────────────────────────────────
 step 10 10 "Executando migrations e seed..."
-if ! docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy >> "$LOG_FILE" 2>&1; then
+if ! docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy </dev/null >> "$LOG_FILE" 2>&1; then
   log "ERROR" "Falha ao aplicar migrations. Verifique: docker compose -f docker-compose.prod.yml logs api --tail=50"
   exit 1
 fi
 log "OK" "Migrations aplicadas"
-if ! docker compose -f docker-compose.prod.yml exec -T api npm run seed >> "$LOG_FILE" 2>&1; then
+if ! docker compose -f docker-compose.prod.yml exec -T api npm run seed </dev/null >> "$LOG_FILE" 2>&1; then
   log "ERROR" "Falha ao executar seed. Verifique: docker compose -f docker-compose.prod.yml logs api --tail=50"
   exit 1
 fi

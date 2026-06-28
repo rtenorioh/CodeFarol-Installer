@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║  CodeFarol — Instalador Automático v2                                      ║
+# ║  CodeFarol — Instalador Automático v1                                      ║
 # ║  Não navegue sozinho.                                                      ║
 # ║                                                                            ║
 # ║  Uso:                                                                      ║
@@ -287,16 +287,25 @@ fi
 # ── Etapa 9: Containers ─────────────────────────────────────────────────────
 step 9 10 "Subindo containers..."
 cd "$INSTALL_DIR"
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build >> "$LOG_FILE" 2>&1
+if ! docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build >> "$LOG_FILE" 2>&1; then
+  log "ERROR" "Falha ao subir containers. Verifique: docker compose -f docker-compose.prod.yml logs --tail=50"
+  exit 1
+fi
 log "INFO" "Aguardando containers ficarem prontos (20s)..."
 sleep 20
 log "OK" "Containers iniciados"
 
 # ── Etapa 10: Migrations + Seed ──────────────────────────────────────────────
 step 10 10 "Executando migrations e seed..."
-docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy >> "$LOG_FILE" 2>&1
+if ! docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy >> "$LOG_FILE" 2>&1; then
+  log "ERROR" "Falha ao aplicar migrations. Verifique: docker compose -f docker-compose.prod.yml logs api --tail=50"
+  exit 1
+fi
 log "OK" "Migrations aplicadas"
-docker compose -f docker-compose.prod.yml exec -T api npm run seed >> "$LOG_FILE" 2>&1
+if ! docker compose -f docker-compose.prod.yml exec -T api npm run seed >> "$LOG_FILE" 2>&1; then
+  log "ERROR" "Falha ao executar seed. Verifique: docker compose -f docker-compose.prod.yml logs api --tail=50"
+  exit 1
+fi
 log "OK" "Seed executado"
 
 # ── Backup automático ────────────────────────────────────────────────────────
@@ -310,13 +319,22 @@ log "OK" "Backup diário configurado (3h)"
 
 # ── Health check ─────────────────────────────────────────────────────────────
 log "INFO" "Verificando instalação..."
-sleep 5
+# A porta 3000 do container "api" não é publicada pro host (só nginx fala com
+# ele via rede interna do Docker) — por isso checamos o Health.Status que o
+# próprio Docker já calcula via HEALTHCHECK, em vez de curl no host.
+HEALTH_STATUS="unknown"
+for i in $(seq 1 10); do
+  HEALTH_STATUS=$(docker inspect --format='{{.State.Health.Status}}' codefarol_api 2>/dev/null || echo "unknown")
+  if [ "$HEALTH_STATUS" = "healthy" ]; then
+    break
+  fi
+  sleep 3
+done
 
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000/v1/health" 2>/dev/null || echo "000")
-if [ "$HTTP_STATUS" = "200" ]; then
-  log "OK" "Health check: API respondendo (200)"
+if [ "$HEALTH_STATUS" = "healthy" ]; then
+  log "OK" "Health check: API respondendo (healthy)"
 else
-  log "ERROR" "Health check falhou (status: $HTTP_STATUS)"
+  log "ERROR" "Health check falhou (status: $HEALTH_STATUS)"
   log "ERROR" "Verifique: docker compose -f docker-compose.prod.yml logs api --tail=50"
 fi
 
